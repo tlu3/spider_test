@@ -20,6 +20,7 @@ class Producer(Thread):
         channel.queue_declare(queue=QUEUE_NAME,durable=True)
 
         get_urls(self.url, channel, QUEUE_NAME)
+        connection.close()
 
 
 def start_producing():
@@ -31,3 +32,6 @@ def start_producing():
         url = BASE_URL + url
         p = Producer(url)
         p.start()
+
+if __name__ == '__main__':
+    start_producing()
