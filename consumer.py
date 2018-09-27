@@ -33,10 +33,10 @@ class Consumer(Thread):
 
             handler(url)
 
-            ch.basic_ack(delivery_tag=method.delivery_tag)
+           # ch.basic_ack(delivery_tag=method.delivery_tag)
 
-        channel.basic_qos(prefetch_count=1)
-        channel.basic_consume(request, queue=QUEUE_NAME)
+        #channel.basic_qos(prefetch_count=1)
+        channel.basic_consume(request, queue=QUEUE_NAME, no_ack=True)
 
         channel.start_consuming()
 
@@ -45,3 +45,7 @@ def start_consuming():
     for i in range(5):
         c = Consumer()
         c.start()
+
+
+if __name__ == '__main__':
+    start_consuming()
