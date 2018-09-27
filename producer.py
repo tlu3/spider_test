@@ -1,5 +1,5 @@
 from funcs import get_urls, get_regions
-from const import BASE_URL, QUEUE_NAME,RABBITMQ_PORT,RABBITMQ_HOST
+from const import BASE_URL, QUEUE_NAME, RABBITMQ_PORT, RABBITMQ_HOST
 from threading import Thread
 import pika
 import logging
@@ -13,11 +13,11 @@ class Producer(Thread):
         self.url = url
 
     def run(self):
-        connection = pika.BlockingConnection(pika.ConnectionParameters(RABBITMQ_HOST, RABBITMQ_PORT,heartbeat=0))
+        connection = pika.BlockingConnection(pika.ConnectionParameters(RABBITMQ_HOST, RABBITMQ_PORT, heartbeat=0))
         channel = connection.channel()
 
         # define queue
-        channel.queue_declare(queue=QUEUE_NAME,durable=True)
+        channel.queue_declare(queue=QUEUE_NAME, durable=True)
 
         get_urls(self.url, channel, QUEUE_NAME)
         connection.close()
@@ -32,6 +32,7 @@ def start_producing():
         url = BASE_URL + url
         p = Producer(url)
         p.start()
+
 
 if __name__ == '__main__':
     start_producing()
