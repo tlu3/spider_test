@@ -1,43 +1,23 @@
-from funcs import get_house_info, get_soup
 from threading import Thread
-import db
-from const import QUEUE_NAME, RABBITMQ_PORT, RABBITMQ_HOST
-import pika
-import logging
+
+from broker import setup_queue, setup_connection, get_url_from_queue
+from const import QUEUE_NAME
+from db import insert_into_db
+from funcs import get_houses_info
 
 
 # 创建消费者类
 class Consumer(Thread):
 
     def run(self):
-        connection = pika.BlockingConnection(
-            pika.ConnectionParameters(host=RABBITMQ_HOST, port=RABBITMQ_PORT, heartbeat=0))
-        channel = connection.channel()
-
-        # define queue
-        channel.queue_declare(queue=QUEUE_NAME, durable=True)
+        connection = setup_connection()
+        channel = setup_queue(connection, QUEUE_NAME)
 
         def handler(url):
-            logging.debug('getting house infos on url : {url}'.format(url=url))
-            print('get url :----------------------------', url)
-            soup = get_soup(url)
-            houses = soup.find_all('div', {'class': 'nlc_details'})
-            for house in houses:
-                house_info = get_house_info(house)
-                db.insert_into_db(house_info)
+            houses_info = get_houses_info(url)
+            insert_into_db(houses_info)
 
-        # 定义接收到消息的处理方法
-        def request(ch, method, properties, body):
-            url = body
-
-            handler(url)
-
-        # ch.basic_ack(delivery_tag=method.delivery_tag)
-
-        # channel.basic_qos(prefetch_count=1)
-        channel.basic_consume(request, queue=QUEUE_NAME, no_ack=True)
-
-        channel.start_consuming()
+        get_url_from_queue(channel, QUEUE_NAME, handler)
 
 
 def start_consuming():

@@ -1,8 +1,9 @@
-from funcs import get_urls, get_regions
-from const import BASE_URL, QUEUE_NAME, RABBITMQ_PORT, RABBITMQ_HOST
-from threading import Thread
-import pika
 import logging
+from threading import Thread
+
+from broker import send_url_to_queue, setup_connection, close_connection, setup_queue
+from const import BASE_URL, QUEUE_NAME
+from funcs import get_urls, get_regions
 
 
 # 创建生产者类
@@ -13,14 +14,15 @@ class Producer(Thread):
         self.url = url
 
     def run(self):
-        connection = pika.BlockingConnection(pika.ConnectionParameters(RABBITMQ_HOST, RABBITMQ_PORT, heartbeat=0))
-        channel = connection.channel()
-
-        # define queue
-        channel.queue_declare(queue=QUEUE_NAME, durable=True)
-
-        get_urls(self.url, channel, QUEUE_NAME)
-        connection.close()
+        connection = setup_connection()
+        channel = setup_queue(connection, QUEUE_NAME)
+        logging.debug('crawling urls')
+        urls = get_urls(self.url)
+        logging.debug('get urls: {urls}'.format(urls=str(urls)))
+        for url in urls:
+            logging.debug('sending url {url} to queue {queue}'.format(url=url, queue=QUEUE_NAME))
+            send_url_to_queue(channel, url, QUEUE_NAME)
+        close_connection(connection)
 
 
 def start_producing():
