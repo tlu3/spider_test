@@ -1,4 +1,7 @@
+import logging
+
 import pymongo
+
 from const import DB_HOST, DB_PORT
 
 # 创建mongodb的连接对象
@@ -16,14 +19,18 @@ collection = db.spider_rent
 
 
 def insert_into_db(record):
+    logging.debug(
+        'inserting record {record} into collection {collection}'.format(record=str(record), collection=str(collection)))
     if type(record) == list:
         data = collection.insert_many(record)
     elif type(record) == dict:
         data = collection.insert_one(record)
     else:
+        logging.debug('wrong record format')
         print('wrong record format')
         data = 0
     if not data:
+        logging.debug('inserting failed')
         print('inserting failed')
 
 
@@ -43,8 +50,6 @@ def select_many_and_sort_db(feature, condition=None, order=pymongo.ASCENDING):
 
 
 if __name__ == "__main__":
-    # record = [{'age': {'guess':20}}, {'type': 'y'}]
-    # insert_into_db(record)
     results = select_many_and_sort_db('addr')
     print(results.count())
     for result in results:

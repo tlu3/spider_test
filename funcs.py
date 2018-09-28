@@ -1,15 +1,12 @@
-from bs4 import BeautifulSoup
-import requests
+from functools import wraps
+import logging
 import re
 import time
-from functools import wraps
-import queue
+
+from bs4 import BeautifulSoup
+import requests
+
 from const import BASE_URL
-import pika
-
-
-# 创建一个队列
-q = queue.Queue()
 
 
 # test performance decorator
@@ -19,7 +16,7 @@ def time_consuming(func):
         start_time = time.time()
         result = func(*args)
         end_time = time.time()
-        print('---func:%s, consuming time: %s s---' % (func.__name__, end_time - start_time))
+        logging.debug('func:{func}, consuming time: {time}'.format(func=func.__name__, time=end_time - start_time))
         return result
 
     return wrapper
@@ -41,8 +38,10 @@ def get_regions():
     regions_data = soup.find('li', {'class': 'quyu_name'}).find_all('a', {'href': re.compile('/house/s/.*?/')})
     regions = dict()
     for region in regions_data:
+        logging.debug('getting url for region : {region}'.format(region=region))
         district = region.get_text()
         url = region['href']
+        logging.debug('got region : {region}, with url : {url}'.format(region=region, url=url))
         regions[district] = url
 
     return regions
@@ -50,7 +49,8 @@ def get_regions():
 
 # get urls of all related pages
 @time_consuming
-def get_urls(url, channel, queue_name):
+def get_urls(url):
+    urls = list()
     soup = get_soup(url)
     page_data = soup.find('div', {'class': 'page'})
     if page_data:
@@ -58,23 +58,24 @@ def get_urls(url, channel, queue_name):
         last_page = int(last_url.split('/')[-2][2:])
         prefix_url = '/'.join(last_url.split('/')[:-2])
         postfix_last_page = last_url.split('/')[-2][:2]
-
         for num in range(1, last_page + 1):
             new_url = BASE_URL + prefix_url + '/' + postfix_last_page + str(num)
-            send_msg(channel, new_url, queue_name)
-
+            urls.append(new_url)
     else:
-        send_msg(channel, url, queue_name)
+        urls.append(url)
+    return urls
 
 
-# rabbitMQ send message through exchange
-def send_msg(channel, body, queue_name):
-
-    channel.basic_publish(exchange='', routing_key=queue_name, body=str(body),
-                          properties=pika.BasicProperties(delivery_mode=2))  # make message persistent
-    # default: routing_key --> queue name, body--> msg body
-
-    print('send msg : %s' % body)
+def get_houses_info(url):
+    logging.debug('getting houses infos on url : {url}'.format(url=url))
+    soup = get_soup(url)
+    houses = soup.find_all('div', {'class': 'nlc_details'})
+    houses_info = list()
+    for house in houses:
+        logging.debug('getting house {house} info'.format(house=str(house)))
+        house_info = get_house_info(house)
+        houses_info.append(house_info)
+    return houses_info
 
 
 # get house info, including name style address and price
@@ -96,21 +97,28 @@ def get_house_info(house):
 
 def get_house_title(house):
     title = house.find('a', {'target': '_blank'}).get_text().strip()
+    logging.debug('got house {house} with title: {title}'.format(house=str(house), title=title))
     return title
 
 
 def get_house_url(house):
     url = house.find('a', {'target': '_blank'})['href']
+    logging.debug('got house {house} with url: {url}'.format(house=str(house), url=url))
+
     return url
 
 
 def get_house_style(house):
     style = house.find('div', {'class': 'house_type'}).get_text().replace('\t', '').replace('\n', '')
+    logging.debug('got house {house} with style: {style}'.format(house=str(house), style=style))
+
     return style
 
 
 def get_house_addr(house):
     addr = house.find('div', {'class': 'address'}).find('a')['title']
+    logging.debug('got house {house} with address: {addr}'.format(house=str(house), addr=addr))
+
     return addr
 
 
@@ -124,4 +132,6 @@ def get_house_price(house):
             price = price_data.find('i').get_text().strip()
             unit = price_data.find('em').get_text().strip()
             price += unit
+    logging.debug('got house {house} with price: {price}'.format(house=str(house), price=price))
+
     return price
