@@ -19,7 +19,7 @@ def get_url_from_queue(channel, queue_name, handler=None):
         url = body
         print('got msg : %s' % body)
         logging.debug('getting url {url} from queue {queue}'.format(url=url, queue=queue_name))
-        if handler:
+        if callable(handler):
             handler(url)
         ch.basic_ack(delivery_tag=method.delivery_tag)
 
